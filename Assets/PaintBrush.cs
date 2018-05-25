@@ -7,8 +7,12 @@ public class PaintBrush : MonoBehaviour
     /// <summary>
     /// Debug stuff
     /// </summary>
+    public Transform hitTransform;
+    public List<SkinnedMeshRenderer> hitSkinnedmeshes;
     public Renderer editorRenderer;
     public Texture2D editorTexture2D;
+    public Texture2D editorTexture2DdiffuseReadonly;
+    public Vector2 coordinates;
     public int MinSplash = 5;
     public int MaxSplash = 115;
     public int PixelRange = 50; 
@@ -16,12 +20,6 @@ public class PaintBrush : MonoBehaviour
 
     private float MinScale = 0.25f;
     private float MaxScale = 2.5f;
-
-
-
-
-
-
 
     public int resolution = 512;
     Texture2D whiteMap;
@@ -44,8 +42,9 @@ public class PaintBrush : MonoBehaviour
         if (Physics.Raycast(Camera.main.ScreenPointToRay(Input.mousePosition), out hit) /*&& Input.GetKeyDown(KeyCode.Space)*/) 
         {
             /// debug ray
-            Debug.DrawRay(hit.point, (hit.normal * 5f), Color.magenta);
 
+            Debug.DrawRay(hit.point, (hit.normal * 5f), Color.magenta);
+            hitTransform = hit.collider.transform;
             if (stored != hit.lightmapCoord) // stop drawing on the same point
             {
                 Paint(hit.point, hit);
@@ -62,7 +61,6 @@ public class PaintBrush : MonoBehaviour
                     Renderer rend = hit.transform.GetComponent<Renderer>();
                     paintTextures.Add(coll, getWhiteRT());
                     rend.material.SetTexture("_PaintMap", paintTextures[coll]);
-
 
                 }
                 if (stored != hit.lightmapCoord) // stop drawing on the same point
@@ -124,16 +122,63 @@ public class PaintBrush : MonoBehaviour
         int n = -1;
 
 
+        
+        var anim = hit.transform.GetComponent<Animator>();
+        if(anim!=null)
+        {
+            hitSkinnedmeshes = new List<SkinnedMeshRenderer>();
+            foreach(Transform child in anim.transform)
+            {
+                var sm = child.GetComponent<SkinnedMeshRenderer>();
+                if(sm!=null)
+                {
+                    hitSkinnedmeshes.Add(sm);
+                    // the magic
+                    editorRenderer = sm;
+                    editorTexture2D = editorRenderer.material.GetTexture("_PaintMap") as Texture2D;
+                    editorTexture2DdiffuseReadonly= editorRenderer.material.GetTexture("_MainTex") as Texture2D;
+                    resolution = editorTexture2D.height;
+                    stored = hit.textureCoord;
+                    Vector2 pixelUV3 = hit.textureCoord;
+                    pixelUV3.y *= resolution;
+                    pixelUV3.x *= resolution;
+                    coordinates = pixelUV3;
 
+                    while (n <= drops)
+                    {
+                        n++;
+
+                        float chancex = UnityEngine.Random.Range((float)0, (float)1);
+                        float chancey = UnityEngine.Random.Range((float)0, (float)1);
+
+                        int randomX = UnityEngine.Random.Range(-PixelRange, PixelRange);
+                        int randomY = UnityEngine.Random.Range(-PixelRange, PixelRange);
+                        if (chancex > 0.8)
+                            randomX *= randomX * randomX;
+                        if (chancey > 0.8)
+                            randomY *= randomY * randomX;
+
+                        editorTexture2D.SetPixel((int)(pixelUV3.x + randomX), (int)(pixelUV3.y + randomY), Color.red);
+                    }
+
+                    
+                    editorTexture2D.Apply();
+                }
+
+            }
+            return;
+        }
+        // the magic
         editorRenderer = hit.transform.GetComponent<Renderer>();
         editorTexture2D = editorRenderer.material.GetTexture("_PaintMap") as Texture2D;
+        editorTexture2DdiffuseReadonly= editorRenderer.material.GetTexture("_MainTex") as Texture2D;
         resolution = editorTexture2D.height;
 
         stored = hit.lightmapCoord;
         Vector2 pixelUV2 = hit.lightmapCoord;
         pixelUV2.y *= resolution;
         pixelUV2.x *= resolution;
-
+        coordinates = pixelUV2;
 
         while (n <= drops)
         {
